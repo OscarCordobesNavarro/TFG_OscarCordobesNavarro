@@ -1,0 +1,12 @@
+{
+  "C": 5,
+  "L": 3,
+  "CustomerDemand": [3, 2, 4, 2, 6],
+  "MaxCapacity": [9, 3, 6],
+  "TransportationCost": [
+    [5, 2, 7, 3, 6],
+    [10, 10, 3, 1, 5],
+    [7, 6, 10, 7, 10]
+  ],
+  "OpeningCost": [10, 6, 1]
+}
