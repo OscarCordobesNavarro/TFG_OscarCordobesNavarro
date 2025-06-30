@@ -1,44 +1,40 @@
 import json
 import numpy as np
+
 import gurobipy as gp
 
-with open("Data5.json", "r") as f:
+with open("DataMod.json", "r") as f:
     data = json.load(f)
 
-MaxCapacity = data["MaxCapacity"]
-TransportationCost = data["TransportationCost"]
-C = data["C"]
-CustomerDemand = data["CustomerDemand"]
-L = data["L"]
-OpeningCost = data["OpeningCost"]
+
+T = data["T"]
+UnitsProduced = data["UnitsProduced"]
+UnitsRequired = data["UnitsRequired"]
+P = data["P"]
+
+# MaterialUsedForPattern is now a parameter read from data
+MaterialUsedForPattern = data["MaterialUsedForPattern"]
 
 # Define model
 model = gp.Model('model')
 
 
 # ====== Define variables ====== 
-X = model.addVars(L, C, name='X', vtype=gp.GRB.CONTINUOUS)
-NumberOfFacilitiesOpened = model.addVar(name='NumberOfFacilitiesOpened', vtype=gp.GRB.INTEGER)
-Y = model.addVars(L, name='Y', vtype=gp.GRB.BINARY)
-CustomerAssignment = model.addVars(L, C, name='CustomerAssignment', vtype=gp.GRB.INTEGER)
+PatternUsageFrequency = model.addVars(P, name='PatternUsageFrequency', vtype=gp.GRB.INTEGER)
 
 # ====== Define constraints ====== 
 
-for l in range(L):
-    model.addConstr(gp.quicksum(X[l, c] for c in range(C)) <= MaxCapacity[l] * Y[l], name=f"capacity_constraint_{l}")
+for t in range(T):
+    model.addConstr(gp.quicksum(UnitsProduced[p][t] * PatternUsageFrequency[p] for p in range(P)) >= UnitsRequired[t], name=f'units_requirement_{t}')
 
-for c in range(C):
-    model.addConstr(gp.quicksum(X[l, c] for l in range(L)) == CustomerDemand[c], name=f'demand_satisfaction_{c}')
+for p in range(P):
+    model.addConstr(PatternUsageFrequency[p] >= 0, name=f"non_negativity_pattern_{p}")
 
-model.addConstr(NumberOfFacilitiesOpened == gp.quicksum(Y[l] for l in range(L)), "facility_count_constraint")
-
-for l in range(L):
-    for c in range(C):
-        model.addConstr(CustomerAssignment[l, c] >= 0, name=f"non_negativity_{l}_{c}")
+# Note: Removed redundant constraint as identified in the analysis
 
 # ====== Define objective ====== 
 
-model.setObjective(gp.quicksum(OpeningCost[l] * Y[l] for l in range(L)) + gp.quicksum(TransportationCost[l][c] * X[l, c] for l in range(L) for c in range(C)), gp.GRB.MINIMIZE)
+model.setObjective(gp.quicksum(MaterialUsedForPattern[p] * PatternUsageFrequency[p] for p in range(P)), gp.GRB.MINIMIZE)
 
 # Optimize model
 model.optimize()

@@ -1,8 +1,9 @@
 import json
 import numpy as np
+
 import gurobipy as gp
 
-with open("Data1.json", "r") as f:
+with open("DataMod.json", "r") as f:
     data = json.load(f)
 
 
@@ -10,7 +11,7 @@ BinCapacity = data["BinCapacity"]
 N = data["N"]
 ItemSizes = data["ItemSizes"]
 
-# Define the number of bins, initially set to the number of items
+# Define the number of bins
 B = N
 
 # Define model

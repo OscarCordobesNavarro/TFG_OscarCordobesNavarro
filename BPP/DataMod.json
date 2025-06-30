@@ -1,5 +1,5 @@
 {
-  "BinCapacity": 6,
+  "BinCapacity": 10,
   "N": 6,
   "ItemSizes": [8, 3, 6, 1, 4, 10]
 }

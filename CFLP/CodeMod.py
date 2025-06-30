@@ -1,50 +1,50 @@
 import json
 import numpy as np
-
 import gurobipy as gp
 
-with open("Data.json", "r") as f:
+with open("DataMod.json", "r") as f:
     data = json.load(f)
 
 
-Capacity = data["Capacity"]
-Demand = data["Demand"]
-N = data["N"]
-TravelCost = data["TravelCost"]
+MaxCapacity = data["MaxCapacity"]
+TransportationCost = data["TransportationCost"]
+C = data["C"]
+CustomerDemand = data["CustomerDemand"]
+L = data["L"]
+OpeningCost = data["OpeningCost"]
 
 # Define model
 model = gp.Model('model')
 
 
 # ====== Define variables ====== 
-Route = model.addVars(N, N, name='Route', vtype=gp.GRB.BINARY)
-NumRoutes = model.addVar(name='NumRoutes', vtype=gp.GRB.INTEGER)
-K = model.addVar(name='K', vtype=gp.GRB.INTEGER)
+X = model.addVars(L, C, name='X', vtype=gp.GRB.CONTINUOUS)
+NumberOfFacilitiesOpened = model.addVar(name='NumberOfFacilitiesOpened', vtype=gp.GRB.INTEGER)
+Y = model.addVars(L, name='Y', vtype=gp.GRB.BINARY)
+CustomerAssignment = model.addVars(L, C, name='CustomerAssignment', vtype=gp.GRB.INTEGER)
 
 # ====== Define constraints ====== 
 
-for i in range(N):
-    model.addConstr(gp.quicksum(Route[i, j] for j in range(N)) == 1, name=f"visit_once_{i}")
+for l in range(L):
+    model.addConstr(gp.quicksum(X[l, c] for c in range(C)) <= MaxCapacity[l] * Y[l], name=f"capacity_constraint_{l}")
+    
+for l in range(L):
+    for c in range(C):
+        model.addConstr(X[l, c] <= CustomerDemand[c] * Y[l], name=f"linking_constraint_{l}_{c}")
 
-model.addConstr(gp.quicksum(Demand[j] * Route[i, j] for i in range(N) for j in range(N)) <= Capacity, name="delivery_capacity")
+for c in range(C):
+    model.addConstr(gp.quicksum(X[l, c] for l in range(L)) == CustomerDemand[c], name=f'demand_satisfaction_{c}')
 
-model.addConstr(gp.quicksum(Route[0, j] for j in range(N)) == 1, name="start_at_depot")
-model.addConstr(gp.quicksum(Route[i, 0] for i in range(N)) == 1, name="end_at_depot")
+NumberOfFacilitiesOpened = model.addVar(name="NumberOfFacilitiesOpened", vtype=gp.GRB.INTEGER)
+model.addConstr(NumberOfFacilitiesOpened == gp.quicksum(Y[l] for l in range(L)), "facility_count_constraint")
 
-model.addConstr(NumRoutes >= 1, name="positive_num_routes")
-
-for i in range(N):
-    for j in range(N):
-        model.addConstr(TravelCost[i][j] >= 0, name=f"non_negative_travel_cost_{i}_{j}")
-
-for i in range(N):
-    model.addConstr(Demand[i] >= 0, name=f"demand_non_negative_{i}")
-
-model.addConstr(Capacity > 0, name="positive_capacity")
+for l in range(L):
+    for c in range(C):
+        model.addConstr(CustomerAssignment[l, c] >= 0, name=f"non_negativity_{l}_{c}")
 
 # ====== Define objective ====== 
 
-model.setObjective(gp.quicksum(TravelCost[i][j] * Route[i, j] for i in range(N) for j in range(N)), gp.GRB.MINIMIZE)
+model.setObjective(gp.quicksum(OpeningCost[l] * Y[l] for l in range(L)) + gp.quicksum(TransportationCost[l][c] * X[l, c] for l in range(L) for c in range(C)), gp.GRB.MINIMIZE)
 
 # Optimize model
 model.optimize()
@@ -65,7 +65,7 @@ if status == gp.GRB.OPTIMAL:
             "symbol": var.VarName,
             "value": var.X,
         }
-        for var in model.getVars()
+        for var in model.getVars() if var.X != 0
     ]
     solving_info["runtime"] = model.Runtime
     solving_info["iteration_count"] = model.IterCount
@@ -96,4 +96,3 @@ else:
     solving_info["variables"] = []
     solving_info["runtime"] = None
     solving_info["iteration_count"] = None
-

@@ -1,20 +1,18 @@
 import json
 import numpy as np
-
 import gurobipy as gp
 
-with open("Data3.json", "r") as f:
+with open("Data.json", "r") as f:
     data = json.load(f)
 
 
 T = data["T"]
-UnitsProduced = data["UnitsProduced"]
+UnitsProduced = np.array(data["UnitsProduced"])  # Ensure this is a numpy array
 UnitsRequired = data["UnitsRequired"]
 P = data["P"]
 
 # Define model
 model = gp.Model('model')
-
 
 # ====== Define variables ====== 
 PatternUsageFrequency = model.addVars(P, name='PatternUsageFrequency', vtype=gp.GRB.INTEGER)
@@ -23,13 +21,10 @@ MaterialUsedForPattern = model.addVars(P, name='MaterialUsedForPattern', vtype=g
 # ====== Define constraints ====== 
 
 for t in range(T):
-    model.addConstr(gp.quicksum(UnitsProduced[p][t] * PatternUsageFrequency[p] for p in range(P)) >= UnitsRequired[t], name=f'units_requirement_{t}')
+    model.addConstr(gp.quicksum(UnitsProduced[p, t] * PatternUsageFrequency[p] for p in range(P)) >= UnitsRequired[t], name=f'units_requirement_{t}')
 
 for p in range(P):
     model.addConstr(PatternUsageFrequency[p] >= 0, name=f"non_negativity_pattern_{p}")
-
-for t in range(T):
-    model.addConstr(gp.quicksum(UnitsProduced[p][t] * PatternUsageFrequency[p] for p in range(P)) >= 0, name=f"non_negative_units_{t}")
 
 # ====== Define objective ====== 
 
@@ -38,10 +33,8 @@ model.setObjective(gp.quicksum(MaterialUsedForPattern[p] * PatternUsageFrequency
 # Optimize model
 model.optimize()
 
-
 # Get model status
 status = model.status
-
 
 # Get solver information
 solving_info = {}
@@ -84,4 +77,3 @@ else:
     solving_info["variables"] = []
     solving_info["runtime"] = None
     solving_info["iteration_count"] = None
-
