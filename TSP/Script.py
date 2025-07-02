@@ -4,7 +4,7 @@ import matplotlib.pyplot as plt
 import os
 
 # Cargar datos del JSON
-json_path = os.path.join(os.path.dirname(__file__), 'DataMod.json')
+json_path = os.path.join(os.path.dirname(__file__), 'Data2.json')
 with open(json_path, 'r') as f:
     data = json.load(f)
 

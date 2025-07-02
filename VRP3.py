@@ -2,49 +2,51 @@ import json
 import numpy as np
 import gurobipy as gp
 
-with open("DataMod.json", "r") as f:
+with open("VRP2Data.json", "r") as f:
     data = json.load(f)
 
 
-MaxCapacity = data["MaxCapacity"]
-TransportationCost = data["TransportationCost"]
-C = data["C"]
-CustomerDemand = data["CustomerDemand"]
-L = data["L"]
-OpeningCost = data["OpeningCost"]
+Distance = data["Distance"]
+Demand = data["Demand"]
+P = data["P"]
+N = data["N"]
+Q = data["Q"]
 
 # Define model
 model = gp.Model('model')
 
 
 # ====== Define variables ====== 
-X = model.addVars(L, C, name='X', vtype=gp.GRB.CONTINUOUS)
-NumberOfFacilitiesOpened = model.addVar(name='NumberOfFacilitiesOpened', vtype=gp.GRB.INTEGER)
-Y = model.addVars(L, name='Y', vtype=gp.GRB.BINARY)
-CustomerAssignment = model.addVars(L, C, name='CustomerAssignment', vtype=gp.GRB.INTEGER)
+ArrivalTime = model.addVars(range(1, N), name='ArrivalTime', vtype=gp.GRB.CONTINUOUS)
+Travel = model.addVars(N, N, P, name='Travel', vtype=gp.GRB.BINARY)
 
 # ====== Define constraints ====== 
 
-for l in range(L):
-    model.addConstr(gp.quicksum(X[l, c] for c in range(C)) <= MaxCapacity[l] * Y[l], name=f"capacity_constraint_{l}")
-    
-for l in range(L):
-    for c in range(C):
-        model.addConstr(X[l, c] <= CustomerDemand[c] * Y[l], name=f"linking_constraint_{l}_{c}")
+for k in range(P):
+    model.addConstr(gp.quicksum(Travel[0, j, k] for j in range(1, N)) == 1, name=f"start_depot_{k}")
+    model.addConstr(gp.quicksum(Travel[i, 0, k] for i in range(1, N)) == 1, name=f"end_depot_{k}")
 
-for c in range(C):
-    model.addConstr(gp.quicksum(X[l, c] for l in range(L)) == CustomerDemand[c], name=f'demand_satisfaction_{c}')
+for j in range(1, N):
+    model.addConstr(gp.quicksum(Travel[i, j, k] for i in range(N) for k in range(P)) == 1, name=f"visit_once_{j}")
 
-NumberOfFacilitiesOpened = model.addVar(name="NumberOfFacilitiesOpened", vtype=gp.GRB.INTEGER)
-model.addConstr(NumberOfFacilitiesOpened == gp.quicksum(Y[l] for l in range(L)), "facility_count_constraint")
+for i in range(1, N):
+    for k in range(P):
+        model.addConstr(gp.quicksum(Travel[i, j, k] for j in range(N)) == gp.quicksum(Travel[j, i, k] for j in range(N)), name=f"flow_conservation_city_{i}_vehicle_{k}")
 
-for l in range(L):
-    for c in range(C):
-        model.addConstr(CustomerAssignment[l, c] >= 0, name=f"non_negativity_{l}_{c}")
+# Remove duplicate constraints - these are now handled above
+
+for k in range(P):
+    model.addConstr(gp.quicksum(Demand[j] * gp.quicksum(Travel[i, j, k] for i in range(N)) for j in range(1, N)) <= Q, name=f"demand_constraint_{k}")
+
+for i in range(1, N):
+    for j in range(1, N):
+        if i != j:
+            for k in range(P):
+                model.addConstr(ArrivalTime[i] - ArrivalTime[j] + N * Travel[i, j, k] <= N - 1, name=f"MTZ_{i}_{j}_{k}")
 
 # ====== Define objective ====== 
 
-model.setObjective(gp.quicksum(OpeningCost[l] * Y[l] for l in range(L)) + gp.quicksum(TransportationCost[l][c] * X[l, c] for l in range(L) for c in range(C)), gp.GRB.MINIMIZE)
+model.setObjective(gp.quicksum(Travel[i,j,k] * Distance[i][j] for i in range(N) for j in range(N) for k in range(P)), gp.GRB.MINIMIZE)
 
 # Optimize model
 model.optimize()
@@ -65,7 +67,7 @@ if status == gp.GRB.OPTIMAL:
             "symbol": var.VarName,
             "value": var.X,
         }
-        for var in model.getVars() if var.X != 0
+        for var in model.getVars()
     ]
     solving_info["runtime"] = model.Runtime
     solving_info["iteration_count"] = model.IterCount
@@ -76,6 +78,7 @@ if status == gp.GRB.OPTIMAL:
     print("Valor objetivo:", solving_info["objective_value"])
     print("Variables seleccionadas:")
     for var in solving_info["variables"]:
+        if var['value'] == 1:
             print(f"  {var['symbol']}: {var['value']}")
     print("Tiempo de ejecución:", solving_info["runtime"])
     print("Iteraciones:", solving_info["iteration_count"])
