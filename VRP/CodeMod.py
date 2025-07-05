@@ -2,7 +2,7 @@ import json
 import numpy as np
 import gurobipy as gp
 
-with open("Data.json", "r") as f:
+with open("DataMod.json", "r") as f:
     data = json.load(f)
 
 C = data["C"]
