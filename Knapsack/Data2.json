@@ -1,6 +1,6 @@
 {
-  "MaxCapacity": 5,
-  "N": 3,
-  "Values": [6, 4, 5],
-  "Weights": [2, 3, 4]
+  "MaxCapacity": 15,
+  "N": 8,
+  "Values": [12, 10, 20, 15, 8, 25, 18, 14],
+  "Weights": [3, 4, 8, 6, 2, 10, 7, 5]
 }
