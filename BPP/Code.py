@@ -3,7 +3,7 @@ import numpy as np
 
 import gurobipy as gp
 
-with open("DataMod.json", "r") as f:
+with open("Data4.json", "r") as f:
     data = json.load(f)
 
 
@@ -69,11 +69,17 @@ if status == gp.GRB.OPTIMAL:
     print("Estado:", solving_info["status"])
     print("Valor objetivo:", solving_info["objective_value"])
     print("Variables seleccionadas:")
+    total_size = 0
     for var in solving_info["variables"]:
-        if var['value'] == 1:
+        if var['value'] == 1 and var['symbol'].startswith("ItemInBin"):
+            # Extraer el índice del item
+            parts = var['symbol'].split('[')[1].split(']')[0].split(',')
+            item_idx = int(parts[0])
+            total_size += ItemSizes[item_idx]
             print(f"  {var['symbol']}: {var['value']}")
     print("Tiempo de ejecución:", solving_info["runtime"])
     print("Iteraciones:", solving_info["iteration_count"])
+    print("Suma total de los tamaños de los items asignados:", total_size)
 else:
     status_dict = {
         gp.GRB.INFEASIBLE: "Infeasible",
