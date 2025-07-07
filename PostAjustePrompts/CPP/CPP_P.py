@@ -5,34 +5,33 @@ import gurobipy as gp
 with open("Data5.json", "r") as f:
     data = json.load(f)
 
+Demand = data["Demand"]
 T = data["T"]
 P = data["P"]
 Pattern = data["Pattern"]
-Demand = data["Demand"]
 MaterialUsedForPattern = data["MaterialUsedForPattern"]
 
 # Define model
 model = gp.Model('model')
 
 # ====== Define variables ====== 
-TimesPatternUsed = model.addVars(P, name='TimesPatternUsed', vtype=gp.GRB.INTEGER)
+UsageCount = model.addVars(P, name='UsageCount', vtype=gp.GRB.INTEGER)
 
 # ====== Define constraints ====== 
 
 for t in range(T):
-    model.addConstr(gp.quicksum(Pattern[p][t] * TimesPatternUsed[p] for p in range(P)) >= Demand[t], name=f"demand_constraint_{t}")
+    model.addConstr(gp.quicksum(Pattern[p][t] * UsageCount[p] for p in range(P)) >= Demand[t], name=f"demand_met_{t}")
 
 for p in range(P):
-    model.addConstr(TimesPatternUsed[p] >= 0, name=f"non_negative_times_pattern_used_{p}")
+    model.addConstr(UsageCount[p] >= 0, name=f"non_negative_usage_{p}")
 
-for t in range(T):
-    model.addConstr(gp.quicksum(Pattern[p][t] * TimesPatternUsed[p] for p in range(P)) >= 0, name=f"non_negative_production_{t}")
-
-model.addConstr(gp.quicksum(MaterialUsedForPattern[p] * TimesPatternUsed[p] for p in range(P)) >= 0, name="non_negative_total_material_used")
+for p in range(P):
+    for t in range(T):
+        model.addConstr(Pattern[p][t] >= 0, name=f"non_negativity_pattern_{p}_{t}")
 
 # ====== Define objective ====== 
 
-model.setObjective(gp.quicksum(MaterialUsedForPattern[p] * TimesPatternUsed[p] for p in range(P)), gp.GRB.MINIMIZE)
+model.setObjective(gp.quicksum(MaterialUsedForPattern[p] * UsageCount[p] for p in range(P)), gp.GRB.MINIMIZE)
 
 # Optimize model
 model.optimize()
@@ -55,21 +54,6 @@ if status == gp.GRB.OPTIMAL:
     ]
     solving_info["runtime"] = model.Runtime
     solving_info["iteration_count"] = model.IterCount
-
-    ## Añadido para mostrar información por consola
-    print("----------------- Modelo optimizado con éxito. ---------------")
-    print("Estado:", solving_info["status"])
-    print("Valor objetivo:", solving_info["objective_value"])
-    print("Variables seleccionadas:")
-    for var in solving_info["variables"]:
-        if var['value'] == 1:
-            print(f"  {var['symbol']}: {var['value']}")
-    print("Tiempo de ejecución:", solving_info["runtime"])
-    print("Iteraciones:", solving_info["iteration_count"])
-    print("\nCantidad producida vs Demanda por tipo:")
-    for t in range(T):
-        producida = sum(Pattern[p][t] * solving_info["variables"][p]["value"] for p in range(P))
-        print(f"  Tipo {t}: Producida = {producida}, Demanda = {Demand[t]}")
 else:
     status_dict = {
         gp.GRB.INFEASIBLE: "Infeasible",
