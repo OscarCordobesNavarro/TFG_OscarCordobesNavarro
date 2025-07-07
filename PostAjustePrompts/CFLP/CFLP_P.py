@@ -2,28 +2,28 @@ import json
 import numpy as np
 import gurobipy as gp
 
-with open("Data5.json", "r") as f:
+with open("Data.json", "r") as f:
     data = json.load(f)
 
 TransportCost = data["TransportCost"]
 OpeningCost = data["OpeningCost"]
-Demand = data["Demand"]
 C = data["C"]
-Capacity = data["Capacity"]
+Demand = data["Demand"]
 L = data["L"]
+Capacity = data["Capacity"]
 
 # Define model
 model = gp.Model('model')
 
 
 # ====== Define variables ====== 
-OpenFacility = model.addVars(L, name='OpenFacility', vtype=gp.GRB.BINARY)
 UnitsShipped = model.addVars(L, C, name='UnitsShipped', vtype=gp.GRB.CONTINUOUS)
+OpenFacility = model.addVars(L, name='OpenFacility', vtype=gp.GRB.BINARY)
 
 # ====== Define constraints ====== 
 
 for c in range(C):
-    model.addConstr(gp.quicksum(UnitsShipped[l, c] for l in range(L)) == Demand[c], name=f"demand_constraint_c{c}")
+    model.addConstr(gp.quicksum(UnitsShipped[l, c] for l in range(L)) == Demand[c], name=f"demand_fulfillment_customer_{c}")
 
 for l in range(L):
     model.addConstr(gp.quicksum(UnitsShipped[l, c] for c in range(C)) <= Capacity[l] * OpenFacility[l], name=f"capacity_constraint_{l}")
@@ -33,23 +33,15 @@ for l in range(L):
         model.addConstr(UnitsShipped[l, c] <= Demand[c] * OpenFacility[l], name=f"demand_assignment_{l}_{c}")
 
 for l in range(L):
-    model.addConstr(OpenFacility[l] <= 1, name=f"OpenFacility_once_{l}")
-
-for l in range(L):
     for c in range(C):
-        model.addConstr(UnitsShipped[l, c] >= 0, name=f"non_negativity_{l}_{c}")
+        model.addConstr(UnitsShipped[l, c] >= 0, name=f"non_negative_shipment_{l}_{c}")
 
-model.addConstr(gp.quicksum(OpenFacility[l] for l in range(L)) <= L, name="facility_open_once")
-
-# Ensure TransportCost is non-negative (assuming it's a numpy array or a list of lists)
-TransportCost = np.array(TransportCost)
-for l in range(L):
-    for c in range(C):
-        assert TransportCost[l, c] >= 0, f"TransportCost[{l}, {c}] is negative!"
+for c in range(C):
+    model.addConstr(gp.quicksum(UnitsShipped[l, c] for l in range(L)) <= Demand[c], name=f'demand_constraint_{c}')
 
 # ====== Define objective ====== 
 
-model.setObjective(gp.quicksum(OpeningCost[l] * OpenFacility[l] for l in range(L)) + gp.quicksum(TransportCost[l, c] * UnitsShipped[l, c] for l in range(L) for c in range(C)), gp.GRB.MINIMIZE)
+model.setObjective(gp.quicksum(OpeningCost[l] * OpenFacility[l] for l in range(L)) + gp.quicksum(TransportCost[l][c] * UnitsShipped[l, c] for l in range(L) for c in range(C)), gp.GRB.MINIMIZE)
 
 # Optimize model
 model.optimize()
@@ -74,25 +66,6 @@ if status == gp.GRB.OPTIMAL:
     ]
     solving_info["runtime"] = model.Runtime
     solving_info["iteration_count"] = model.IterCount
-
-    # Mostrar información detallada por consola
-    print("----------------- Modelo optimizado con éxito. ---------------")
-    print("Estado:", solving_info["status"])
-    print("Valor objetivo:", solving_info["objective_value"])
-    print("Tiempo de ejecución:", solving_info["runtime"])
-    print("Iteraciones:", solving_info["iteration_count"])
-    print("\nVariables seleccionadas (valor distinto de 0):")
-    for var in solving_info["variables"]:
-        if var['value'] != 0:
-            print(f"  {var['symbol']}: {var['value']}")
-    print("\nResumen de instalaciones abiertas:")
-    for var in solving_info["variables"]:
-        if var['symbol'].startswith("OpenFacility") and var['value'] > 0.5:
-            print(f"  {var['symbol']} abierta")
-    print("\nResumen de unidades enviadas:")
-    for var in solving_info["variables"]:
-        if var['symbol'].startswith("UnitsShipped") and var['value'] > 0:
-            print(f"  {var['symbol']}: {var['value']}")
 else:
     status_dict = {
         gp.GRB.INFEASIBLE: "Infeasible",
