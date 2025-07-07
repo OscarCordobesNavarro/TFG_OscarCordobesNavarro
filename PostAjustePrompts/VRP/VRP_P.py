@@ -3,7 +3,6 @@ import numpy as np
 import gurobipy as gp
 
 # Load data
-data = None
 with open("Data5.json", "r") as f:
     data = json.load(f)
 
@@ -20,12 +19,13 @@ Travel = model.addVars(N, N, name='Travel', vtype=gp.GRB.BINARY)
 # ====== Define constraints ====== 
 
 model.addConstr(gp.quicksum(Travel[0, j] for j in range(1, N)) == M, name="vehicles_leave_depot")
+
 model.addConstr(gp.quicksum(Travel[j, 0] for j in range(1, N)) == M, name="vehicles_enter_depot")
 
 for j in range(1, N):
     model.addConstr(gp.quicksum(Travel[i, j] for i in range(N)) == 1, name=f"customer_{j}_visit")
 
-for i in range(1, N):
+for i in range(1, N):  # Adjusted to start from 1 to N-1
     model.addConstr(gp.quicksum(Travel[i, j] for j in range(N)) == 1, name=f"customer_{i}_vehicle_leave")
 
 for i in range(N):
@@ -33,21 +33,15 @@ for i in range(N):
 
 from itertools import combinations
 
+# Subtour elimination constraints should be carefully considered
 for size in range(2, N):
-    for S in combinations(range(1, N), size):
+    for S in combinations(range(1, N), size):  # Start from 1 to ignore the depot
         model.addConstr(gp.quicksum(Travel[i, j] for i in S for j in S) <= len(S) - 1, name=f"subtour_elimination_{S}")
 
-for i in range(N):
-    model.addConstr(gp.quicksum(Travel[i, j] for j in range(N)) >= 0, name=f'vehicle_outflow_node_{i}')
+# Remove unnecessary non-negativity constraints for distances
 
-for j in range(N):
-    model.addConstr(gp.quicksum(Travel[i, j] for i in range(N)) >= 0, name=f"non_negativity_inflow_{j}")
+# ====== Define objective ====== 
 
-for i in range(N):
-    for j in range(N):
-        model.addConstr(Distance[i][j] >= 0, name=f"non_negative_distance_{i}_{j}")
-
-# Objective
 model.setObjective(gp.quicksum(Distance[i][j] * Travel[i, j] for i in range(N) for j in range(N)), gp.GRB.MINIMIZE)
 
 # Optimize model
@@ -67,21 +61,10 @@ if status == gp.GRB.OPTIMAL:
             "symbol": var.VarName,
             "value": var.X,
         }
-        for var in model.getVars()
+        for var in model.getVars() if var.x == 1
     ]
     solving_info["runtime"] = model.Runtime
     solving_info["iteration_count"] = model.IterCount
-
-    ## Añadido para mostrar información por consola
-    print("----------------- Modelo optimizado con éxito. ---------------")
-    print("Estado:", solving_info["status"])
-    print("Valor objetivo:", solving_info["objective_value"])
-    print("Variables seleccionadas:")
-    for var in solving_info["variables"]:
-        if var['value'] == 1:
-            print(f"  {var['symbol']}: {var['value']}")
-    print("Tiempo de ejecución:", solving_info["runtime"])
-    print("Iteraciones:", solving_info["iteration_count"])
 else:
     status_dict = {
         gp.GRB.INFEASIBLE: "Infeasible",
