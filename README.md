@@ -53,6 +53,8 @@ Contiene una instantánea en formato HTML de:
 - Cláusulas generadas directamente por la herramienta
 - **Subcarpeta**: `FormulacionesTrasAjuste/` - Formulaciones después de ajustes
 
+Los tipos de las variables aparecen en la instantánea de forma incorrecta, aparecen todos como binarias. Esto es un problema de la herramienta que realiza la extracción HTML
+
 #### **PostAjustePrompts/**
 Segunda iteración para los problemas que fallaron en la primera iteración:
 
